@@ -32,6 +32,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   VideoPlayerController({
     required this.configuration,
     VideoPlayerDataSource? dataSource,
+    this.initialPlayBackSpeedRate = 1.0,
   }) : super(VideoPlayerValue()) {
     _create();
     if (dataSource != null) _setDataSource(dataSource);
@@ -52,6 +53,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   late Completer<void> _initializeCompleter;
 
   final Completer<void> _createCompleter = Completer<void>();
+
+  final double initialPlayBackSpeedRate;
 
   final VideoPlayerSubtitlesController subtitlesController =
       VideoPlayerSubtitlesController();
@@ -97,6 +100,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     _textureId =
         await VideoPlayerPlatform.instance.create(bufferingConfiguration);
     tracksController.textureId = _textureId;
+    setPlaybackRate(initialPlayBackSpeedRate);
     _createCompleter.complete(null);
 
     void eventListener(PlatformEvent event) {
@@ -329,7 +333,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   void expand() {
-    if (!value.initialized || _isDisposed || !value.isFullscreen || value.isExpanded) return;
+    if (!value.initialized ||
+        _isDisposed ||
+        !value.isFullscreen ||
+        value.isExpanded) return;
     VideoPlayerPlatform.instance.expand(_textureId);
     value = value.copyWith(
       eventType: VideoPlayerEventType.expandChanged,
@@ -338,7 +345,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   void shrink() {
-    if (!value.initialized || _isDisposed || !value.isFullscreen || !value.isExpanded) return;
+    if (!value.initialized ||
+        _isDisposed ||
+        !value.isFullscreen ||
+        !value.isExpanded) return;
     VideoPlayerPlatform.instance.shrink(_textureId);
     value = value.copyWith(
       eventType: VideoPlayerEventType.expandChanged,
