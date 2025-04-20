@@ -32,9 +32,15 @@ class VideoPlayerConfiguration {
   ///Defines controls configuration
   final VideoPlayerControlsConfiguration controlsConfiguration;
 
+  ///Defines custom load configuration
+  final VideoPlayerBufferingConfiguration bufferingConfiguration;
+
   String? Function(AbrTrack track)? quarityTrackSelectable;
 
   final bool hidesControls;
+
+  ///The playback speed rate at which the video will start
+  final double initialPlayBackSpeedRate;
 
   VideoPlayerConfiguration({
     this.aspectRatio,
@@ -51,8 +57,10 @@ class VideoPlayerConfiguration {
     ],
     this.subtitlesConfiguration = const VideoPlayerSubtitlesConfiguration(),
     this.controlsConfiguration = const VideoPlayerControlsConfiguration(),
+    this.bufferingConfiguration = const VideoPlayerBufferingConfiguration(),
     this.quarityTrackSelectable,
     this.hidesControls = false,
+    this.initialPlayBackSpeedRate = 1.0,
   });
 
   VideoPlayerConfiguration copyWith({
@@ -65,8 +73,10 @@ class VideoPlayerConfiguration {
     List<DeviceOrientation>? deviceOrientationsAfterFullScreen,
     VideoPlayerSubtitlesConfiguration? subtitlesConfiguration,
     VideoPlayerControlsConfiguration? controlsConfiguration,
+    VideoPlayerBufferingConfiguration? bufferingConfiguration,
     bool? hidesControls,
     bool? remoteControlEnable,
+    double? initialPlayBackSpeedRate,
   }) {
     return VideoPlayerConfiguration(
       autoPlay: autoPlay ?? this.autoPlay,
@@ -83,7 +93,11 @@ class VideoPlayerConfiguration {
           subtitlesConfiguration ?? this.subtitlesConfiguration,
       controlsConfiguration:
           controlsConfiguration ?? this.controlsConfiguration,
+      bufferingConfiguration:
+          bufferingConfiguration ?? this.bufferingConfiguration,
       hidesControls: hidesControls ?? this.hidesControls,
+      initialPlayBackSpeedRate:
+          initialPlayBackSpeedRate ?? this.initialPlayBackSpeedRate,
     );
   }
 }

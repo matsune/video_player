@@ -150,6 +150,7 @@ class VideoPlayer: NSObject {
     func setDataSource(url: URL, headers: [String: String]?) {
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers ?? [:]])
         let item = AVPlayerItem(asset: asset)
+        item.preferredForwardBufferDuration = 100 
         item.add(videoOutput)
         player.replaceCurrentItem(with: item)
         if let group = asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
@@ -193,6 +194,26 @@ class VideoPlayer: NSObject {
         fullscreenPlayerView.playerLayer.videoGravity = .resizeAspectFill
     }
 
+    func getCurrentVideoResolution() -> CGFloat {
+        guard let videoTrack = player.currentItem?.tracks.compactMap { $0.assetTrack }.filter { $0.mediaType == .video }.first else {
+            return 0
+        }
+
+        let naturalSize = videoTrack.naturalSize
+        let preferredTransform = videoTrack.preferredTransform
+        let realSize = naturalSize.applying(preferredTransform)
+
+        return abs(realSize.height)
+    }
+
+    func getCurrentVideoFrameRate() -> Float {
+        guard let track = player.currentItem?.tracks.first(where: { $0.assetTrack?.mediaType == .video }) else {
+            return 0
+        }
+        
+        return track.currentVideoFrameRate
+    }
+
     func sendEvent(_ eventType: PlatformEventType, _ params: [String: Any] = [:]) {
         var paramsWithEvent = params
         paramsWithEvent["event"] = eventType.rawValue
@@ -232,7 +253,13 @@ class VideoPlayer: NSObject {
                             print(errorLog)
                         }
                     }
-                    self?.sendEvent(.error, ["error": item.error?.localizedDescription as Any])
+                    var invalid = false
+                    var errorCode: Int?
+                    if let nsError = item.error as? NSError {
+                        invalid = nsError.code == NSURLErrorNoPermissionsToReadFile
+                        errorCode = nsError.code
+                    }
+                    self?.sendEvent(.error, ["error": item.error?.localizedDescription as Any, "invalid": invalid, "code": errorCode as Any])
                 case .readyToPlay:
                     self?.readyToPlay()
                 default:

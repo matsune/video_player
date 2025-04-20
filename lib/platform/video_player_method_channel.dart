@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/configurations/configurations.dart';
 import 'package:video_player/controller/controller.dart';
@@ -111,8 +110,11 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         case PlatformEventType.ended:
           return PlatformEvent(eventType: eventType);
         case PlatformEventType.error:
-          final errorDescription = map['error'] as String;
-          throw errorDescription;
+          throw PlayerException(
+            errorDescription: map['error'] as String,
+            invalid: map['invalid'] as bool? ?? false,
+            code: map['code'] as int?,
+          );
         case PlatformEventType.unknown:
           throw "Unknown event type";
       }
@@ -429,6 +431,22 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   Future<void> expand(int? textureId) async {
     await methodChannel.invokeMethod(
       'expand',
+      <String, dynamic>{'textureId': textureId},
+    );
+  }
+
+  @override
+  Future<double> getCurrentVideoResolution(int? textureId) async {
+    return await methodChannel.invokeMethod(
+      'getCurrentVideoResolution',
+      <String, dynamic>{'textureId': textureId},
+    );
+  }
+
+  @override
+  Future<double> getCurrentVideoFrameRate(int? textureId) async {
+    return await methodChannel.invokeMethod(
+      'getCurrentVideoFrameRate',
       <String, dynamic>{'textureId': textureId},
     );
   }

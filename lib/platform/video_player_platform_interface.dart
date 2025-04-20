@@ -131,4 +131,10 @@ abstract class VideoPlayerPlatform extends PlatformInterface {
 
   Future<void> expand(int? textureId) =>
       throw UnimplementedError('expand() has not been implemented.');
+
+  Future<double> getCurrentVideoResolution(int? textureId) =>
+      throw UnimplementedError('getCurrentVideoResolution() has not been implemented.');
+
+  Future<double> getCurrentVideoFrameRate(int? textureId) =>
+      throw UnimplementedError('getCurrentVideoFrameRate() has not been implemented.');
 }

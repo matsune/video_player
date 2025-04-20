@@ -29,7 +29,6 @@ class PlatformEvent {
     this.buffered,
     this.isPip = false,
     this.isMuted = false,
-    this.errorDescription,
   });
 
   final PlatformEventType eventType;
@@ -47,8 +46,18 @@ class PlatformEvent {
   final bool isPip;
 
   final bool isMuted;
+}
 
-  final String? errorDescription;
+class PlayerException implements Exception {
+  PlayerException({
+    required this.errorDescription,
+    required this.invalid,
+    required this.code,
+  });
+
+  final String errorDescription;
+  final bool invalid;
+  final int? code;
 }
 
 /// Describes a discrete segment of time within a video using a [start] and

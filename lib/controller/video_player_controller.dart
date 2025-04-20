@@ -38,8 +38,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   final VideoPlayerConfiguration configuration;
-  VideoPlayerBufferingConfiguration bufferingConfiguration =
-      const VideoPlayerBufferingConfiguration();
 
   int? _textureId;
 
@@ -51,7 +49,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   late Completer<void> _initializeCompleter;
 
-  final Completer<void> _createCompleter = Completer<void>();
+  final Completer<void> createCompleter = Completer<void>();
 
   final VideoPlayerSubtitlesController subtitlesController =
       VideoPlayerSubtitlesController();
@@ -94,10 +92,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   Future<void> _create() async {
-    _textureId =
-        await VideoPlayerPlatform.instance.create(bufferingConfiguration);
+    _textureId = await VideoPlayerPlatform.instance
+        .create(configuration.bufferingConfiguration);
     tracksController.textureId = _textureId;
-    _createCompleter.complete(null);
+    setPlaybackRate(configuration.initialPlayBackSpeedRate);
+    createCompleter.complete(null);
 
     void eventListener(PlatformEvent event) {
       if (_isDisposed) {
@@ -162,6 +161,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         value = value.copyWith(
           eventType: VideoPlayerEventType.error,
           errorDescription: e.message,
+          errorDetails: e.details.toString(),
+        );
+      } else if (object is PlayerException) {
+        final PlayerException e = object;
+        value = value.copyWith(
+          eventType: VideoPlayerEventType.error,
+          errorDescription: e.errorDescription,
+          invalid: e.invalid,
         );
       } else {
         value = value.copyWith(
@@ -181,7 +188,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   @override
   void dispose() async {
-    await _createCompleter.future;
+    await createCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
       await _eventSubscription?.cancel();
@@ -236,9 +243,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (_isDisposed) {
       return;
     }
-    bufferingConfiguration = dataSource.bufferingConfiguration;
     value = VideoPlayerValue();
-    if (!_createCompleter.isCompleted) await _createCompleter.future;
+    if (!createCompleter.isCompleted) await createCompleter.future;
     _initializeCompleter = Completer<void>();
 
     await VideoPlayerPlatform.instance.setDataSource(textureId, dataSource);
@@ -275,6 +281,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       dataSource.headers,
     );
     if (data == null) return;
+    if (!data.trimLeft().startsWith('#EXTM3U')) {
+      final String errorDescription =
+          "Invalid HLS manifest: does not start with #EXTM3U url = ${dataSource.url} data = $data";
+      throw PlayerException(
+        errorDescription: errorDescription,
+        invalid: true,
+        code: null,
+      );
+    }
 
     final abrData = await AbrDataHolder.parse(dataSource.url!, data);
 
@@ -284,7 +299,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     } else {
       subtitlesController.setAbrSubtitlesSourceList(abrData.subtitles ?? []);
     }
-    subtitlesController.selectDefaultSource();
 
     if (subtitlesController.isSelectedNone) return;
 
@@ -329,7 +343,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   void expand() {
-    if (!value.initialized || _isDisposed || !value.isFullscreen || value.isExpanded) return;
+    if (!value.initialized ||
+        _isDisposed ||
+        !value.isFullscreen ||
+        value.isExpanded) return;
     VideoPlayerPlatform.instance.expand(_textureId);
     value = value.copyWith(
       eventType: VideoPlayerEventType.expandChanged,
@@ -338,7 +355,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   void shrink() {
-    if (!value.initialized || _isDisposed || !value.isFullscreen || !value.isExpanded) return;
+    if (!value.initialized ||
+        _isDisposed ||
+        !value.isFullscreen ||
+        !value.isExpanded) return;
     VideoPlayerPlatform.instance.shrink(_textureId);
     value = value.copyWith(
       eventType: VideoPlayerEventType.expandChanged,
@@ -370,11 +390,19 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   Future<void> disablePictureInPicture() =>
       VideoPlayerPlatform.instance.disablePictureInPicture(textureId);
 
-  Future<void> setMuted(bool muted) =>
-      VideoPlayerPlatform.instance.setMuted(textureId, muted);
+  Future<void> setMuted(bool isMuted) {
+    value = value.copyWith(isMuted: isMuted);
+    return VideoPlayerPlatform.instance.setMuted(textureId, isMuted);
+  }
 
   Future<void> setPlaybackRate(double rate) {
     value = value.copyWith(playbackRate: rate);
     return VideoPlayerPlatform.instance.setPlaybackRate(textureId, rate);
   }
+
+  Future<double> getCurrentVideoResolution() async =>
+      await VideoPlayerPlatform.instance.getCurrentVideoResolution(_textureId);
+
+  Future<double> getCurrentVideoFrameRate() async =>
+      await VideoPlayerPlatform.instance.getCurrentVideoFrameRate(_textureId);
 }

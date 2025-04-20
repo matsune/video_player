@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:video_player/abr/abr.dart';
 import 'package:video_player/utils.dart';
 
@@ -11,7 +12,8 @@ import 'video_player_subtitles_source_type.dart';
 enum SubtitlesStreamEvent {
   didReset,
   sourceListChanged,
-  selectedSourceChanged,
+  userSelectedSourceChanged,
+  systemSelectedSourceChanged,
 }
 
 class VideoPlayerSubtitlesController {
@@ -90,7 +92,20 @@ class VideoPlayerSubtitlesController {
     setSubtitleSource(index);
   }
 
-  void setSubtitleSource(int index) {
+  void selectNone() {
+    final noneSubtitlesElementExists = _subtitlesSourceList.firstWhereOrNull(
+            (source) => source.type == VideoPlayerSubtitlesSourceType.none) !=
+        null;
+    if (!noneSubtitlesElementExists) {
+      _subtitlesSourceList.add(VideoPlayerSubtitlesSource(
+          type: VideoPlayerSubtitlesSourceType.none, name: 'None'));
+    }
+    final index = _subtitlesSourceList.indexWhere(
+        (element) => element.type == VideoPlayerSubtitlesSourceType.none);
+    setSubtitleSource(index);
+  }
+
+  void setSubtitleSource(int index, {bool isUserAction = false}) {
     _subtitlesLines = [];
     if (-1 < index && index < subtitlesSourceList.length) {
       _selectedSubtitlesSourceIndex = index;
@@ -101,7 +116,13 @@ class VideoPlayerSubtitlesController {
     } else {
       _selectedSubtitlesSourceIndex = null;
     }
-    _subtitlesStreamController.add(SubtitlesStreamEvent.selectedSourceChanged);
+    if (isUserAction) {
+      _subtitlesStreamController
+          .add(SubtitlesStreamEvent.userSelectedSourceChanged);
+    } else {
+      _subtitlesStreamController
+          .add(SubtitlesStreamEvent.systemSelectedSourceChanged);
+    }
   }
 
   void loadAllSubtitleLines() async {

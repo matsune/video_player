@@ -77,13 +77,17 @@ class _VideoPlayerSubtitlesDrawerState
         break;
       case SubtitlesStreamEvent.sourceListChanged:
         break;
-      case SubtitlesStreamEvent.selectedSourceChanged:
+      case SubtitlesStreamEvent.systemSelectedSourceChanged:
+      case SubtitlesStreamEvent.userSelectedSourceChanged:
         if (controller.subtitlesController.selectedSubtitlesSource
                     ?.asmsIsSegmented ==
                 true &&
             lastValue?.position != null) {
           await controller.subtitlesController
               .loadAsmsSubtitlesSegments(lastValue!.position);
+        }
+        if (!mounted) {
+          return;
         }
         setState(() {});
         break;

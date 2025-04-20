@@ -20,6 +20,7 @@ import androidx.lifecycle.Observer
 import androidx.media3.common.*
 import androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.*
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
@@ -54,6 +55,7 @@ class VideoPlayer(
 
     private var handler = Handler(Looper.getMainLooper())
     private val runnable: Runnable
+    private val bufferingRunnable: Runnable
 
     private var playerNotificationManager: PlayerNotificationManager? = null
     private var refreshHandler: Handler? = null
@@ -63,6 +65,7 @@ class VideoPlayer(
     private val workManager: WorkManager
     private val workerObserverMap: HashMap<UUID, Observer<WorkInfo?>>
     var disableRemoteControl: Boolean = false
+    private var isBufferingRunnableStarted = false
 
     var isMuted: Boolean
         get() = exoPlayer.volume == 0f
@@ -110,11 +113,25 @@ class VideoPlayer(
                     handler.postDelayed(this, 200)
                 }
             }
+        bufferingRunnable =
+            object : Runnable {
+                override fun run() {
+                    val bufferedPosition = exoPlayer.bufferedPosition
+                    if (bufferedPosition != lastSendBufferedPosition) {
+                        val range: List<Number?> = listOf(0, bufferedPosition)
+                        sendEvent(EVENT_BUFFER_CHANGED, mapOf("bufferRange" to range))
+                        lastSendBufferedPosition = bufferedPosition
+                    }
+                    handler.postDelayed(this, 200)
+                }
+            }
     }
 
     fun dispose() {
         disposeMediaSession()
         disposeRemoteNotifications()
+        handler.removeCallbacks(bufferingRunnable)
+        isBufferingRunnableStarted = false
         handler.removeCallbacks(runnable)
         if (isInitialized) {
             exoPlayer.stop()
@@ -148,15 +165,7 @@ class VideoPlayer(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
-                            val bufferedPosition = exoPlayer.bufferedPosition ?: 0L
-                            if (bufferedPosition != lastSendBufferedPosition) {
-                                val range: List<Number?> = listOf(0, bufferedPosition)
-                                sendEvent(
-                                    EVENT_BUFFER_CHANGED,
-                                    mapOf("bufferRange" to listOf(range))
-                                )
-                                lastSendBufferedPosition = bufferedPosition
-                            }
+                            // no-op
                         }
                         Player.STATE_READY -> {
                             if (!isInitialized) {
@@ -175,12 +184,31 @@ class VideoPlayer(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    sendEvent(EVENT_ERROR, mapOf("error" to error.localizedMessage))
+                    var invalid = false;
+
+                    when (val cause = error.cause) {
+                        is HttpDataSource.InvalidResponseCodeException -> {
+                            val responseCode = cause.responseCode
+                            if (responseCode == 403) {
+                                invalid = true
+                            }
+                        }
+                    }
+
+                    sendEvent(
+                        EVENT_ERROR,
+                        mapOf("error" to error.localizedMessage, "invalid" to invalid)
+                    )
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     if (isPlaying) {
                         handler.post(runnable)
+
+                        if (!isBufferingRunnableStarted) {
+                            handler.post(bufferingRunnable)
+                            isBufferingRunnableStarted = true
+                        }
                     } else {
                         handler.removeCallbacks(runnable)
                     }
@@ -286,6 +314,24 @@ class VideoPlayer(
 
     fun onPictureInPictureStatusChanged(isPip: Boolean) {
         sendEvent(EVENT_PIP_CHANGED, mapOf("isPip" to isPip))
+    }
+
+    fun getCurrentVideoResolution(): Double {
+        val currentTracks = exoPlayer.currentTracks
+        for (group in currentTracks.groups) {
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                if (format.sampleMimeType?.startsWith("video") == true) {
+                    return format.height.toDouble()
+                }
+            }
+        }
+        return 0.0
+    }
+
+    fun getCurrentVideoFrameRate(): Double {
+        val videoFormat = exoPlayer.videoFormat
+        return videoFormat?.frameRate?.toDouble() ?: 0.0
     }
 
     @RequiresApi(Build.VERSION_CODES.M)

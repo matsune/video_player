@@ -77,7 +77,7 @@ class _VideoProgressBarState
         newValue.eventType == VideoPlayerEventType.positionChanged;
   }
 
-  void seekToRelativePosition(Offset globalPosition) async {
+  void seekToRelativePosition(Offset globalPosition) {
     final RenderObject? renderObject = context.findRenderObject();
     if (renderObject != null) {
       final box = renderObject as RenderBox;
